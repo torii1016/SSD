@@ -1,0 +1,371 @@
+[SSD]
+    [SSD.network]
+    name = 'SSD'
+    model_start_key = 2
+
+    [SSD.default_box]
+    scale_min = 0.2
+    scale_max = 0.9
+    aspect_set = [[1.0, 1.0, 2.0, 0.5],             # extra fmap 1
+                  [1.0, 1.0, 2.0, 0.5, 3.0, 0.333], # extra fmap 2
+                  [1.0, 1.0, 2.0, 0.5, 3.0, 0.333], # extra fmap 3
+                  [1.0, 1.0, 2.0, 0.5, 3.0, 0.333], # extra fmap 4
+                  [1.0, 1.0, 2.0, 0.5, 3.0, 0.333], # extra fmap 5
+                  [1.0, 1.0, 2.0, 0.5, 3.0, 0.333]] # extra fmap 6
+
+    [SSD.layer1]
+    type = 'conv2d'
+    name = 'conv1_1'
+    output_channel = 64
+    stride = 1
+    fileter_size = [3,3]
+    padding = 'SAME'
+    bn=false
+    activation_fn = 'ReLU'
+    extra_feature = false
+
+    [SSD.layer2]
+    type = 'conv2d'
+    name = 'conv1_2'
+    output_channel = 64
+    stride = 1
+    fileter_size = [3,3]
+    padding = 'SAME'
+    bn=false
+    activation_fn = 'ReLU'
+    extra_feature = false
+
+    [SSD.layer3]
+    type = 'maxpool'
+    karnel_size = [1,2,2,1]
+    stride = [1,2,2,1]
+    padding = 'SAME'
+
+    [SSD.layer4]
+    type = 'conv2d'
+    name = 'conv2_1'
+    output_channel = 128
+    stride = 1
+    fileter_size = [3,3]
+    padding = 'SAME'
+    bn=false
+    activation_fn = 'ReLU'
+    extra_feature = false
+
+    [SSD.layer5]
+    type = 'conv2d'
+    name = 'conv2_2'
+    output_channel = 128
+    stride = 1
+    fileter_size = [3,3]
+    padding = 'SAME'
+    bn=false
+    activation_fn = 'ReLU'
+    extra_feature = false
+
+    [SSD.layer6]
+    type = 'maxpool'
+    karnel_size = [1,2,2,1]
+    stride = [1,2,2,1]
+    padding = 'SAME'
+
+    [SSD.layer7]
+    type = 'conv2d'
+    name = 'conv3_1'
+    output_channel = 256
+    stride = 1
+    fileter_size = [3,3]
+    padding = 'SAME'
+    bn=false
+    activation_fn = 'ReLU'
+    extra_feature = false
+
+    [SSD.layer8]
+    type = 'conv2d'
+    name = 'conv3_2'
+    output_channel = 256
+    stride = 1
+    fileter_size = [3,3]
+    padding = 'SAME'
+    bn=false
+    activation_fn = 'ReLU'
+    extra_feature = false
+
+    [SSD.layer9]
+    type = 'conv2d'
+    name = 'conv3_3'
+    output_channel = 256
+    stride = 1
+    fileter_size = [3,3]
+    padding = 'SAME'
+    bn=false
+    activation_fn = 'ReLU'
+    extra_feature = false
+
+    [SSD.layer10]
+    type = 'maxpool'
+    karnel_size = [1,2,2,1]
+    stride = [1,2,2,1]
+    padding = 'SAME'
+
+    [SSD.layer11]
+    type = 'conv2d'
+    name = 'conv4_1'
+    output_channel = 512
+    stride = 1
+    fileter_size = [3,3]
+    padding = 'SAME'
+    bn=false
+    activation_fn = 'ReLU'
+    extra_feature = false
+
+    [SSD.layer12]
+    type = 'conv2d'
+    name = 'conv4_2'
+    output_channel = 512
+    stride = 1
+    fileter_size = [3,3]
+    padding = 'SAME'
+    bn=false
+    activation_fn = 'ReLU'
+    extra_feature = true
+
+#    [SSD.layer13]
+#    type = 'conv2d'
+#    name = 'conv4_3'
+#    output_channel = 512
+#    stride = 1
+#    fileter_size = [3,3]
+#    padding = 'SAME'
+#    bn=false
+#    activation_fn = 'ReLU'
+#    extra_feature = true
+
+#    [SSD.layer14]
+#    type = 'maxpool'
+#    karnel_size = [1,2,2,1]
+#    stride = [1,2,2,1]
+#    padding = 'SAME'
+
+#    [SSD.layer15]
+#    type = 'conv2d'
+#    name = 'conv5_1'
+#    output_channel = 512
+#    stride = 1
+#    fileter_size = [3,3]
+#    padding = 'SAME'
+#    bn=false
+#    activation_fn = 'ReLU'
+#    extra_feature = false
+
+#    [SSD.layer16]
+#    type = 'conv2d'
+#    name = 'conv5_2'
+#    output_channel = 512
+#    stride = 1
+#    fileter_size = [3,3]
+#    padding = 'SAME'
+#    bn=false
+#    activation_fn = 'ReLU'
+#    extra_feature = false
+
+#    [SSD.layer17]
+#    type = 'conv2d'
+#    name = 'conv5_3'
+#    output_channel = 512
+#    stride = 1
+#    fileter_size = [3,3]
+#    padding = 'SAME'
+#    bn=false
+#    activation_fn = 'ReLU'
+#    extra_feature = false
+
+#    [SSD.layer18]
+#    type = 'maxpool'
+#    karnel_size = [1,2,2,1]
+#    stride = [1,2,2,1]
+#    padding = 'SAME'
+
+    [SSD.layer19]
+    type = 'conv2d'
+    name = 'conv6'
+    output_channel = 1024
+    stride = 1
+    fileter_size = [3,3]
+    padding = 'SAME'
+    bn=false
+    activation_fn = 'ReLU'
+    extra_feature = false
+
+    [SSD.layer20]
+    type = 'maxpool'
+    karnel_size = [1,2,2,1]
+    stride = [1,2,2,1]
+    padding = 'SAME'
+
+    [SSD.layer21]
+    type = 'conv2d'
+    name = 'conv7'
+    output_channel = 1024
+    stride = 1
+    fileter_size = [1,1]
+    padding = 'SAME'
+    bn=false
+    activation_fn = 'ReLU'
+    extra_feature = true
+
+    [SSD.layer22]
+    type = 'conv2d'
+    name = 'conv8_1'
+    output_channel = 256
+    stride = 1
+    fileter_size = [1,1]
+    padding = 'SAME'
+    bn=false
+    activation_fn = 'ReLU'
+    extra_feature = false
+
+    [SSD.layer23]
+    type = 'conv2d'
+    name = 'conv8_2'
+    output_channel = 512
+    stride = 2
+    fileter_size = [3,3]
+    padding = 'SAME'
+    bn=false
+    activation_fn = 'ReLU'
+    extra_feature = true
+
+    [SSD.layer24]
+    type = 'conv2d'
+    name = 'conv9_1'
+    output_channel = 128
+    stride = 1
+    fileter_size = [1,1]
+    padding = 'SAME'
+    bn=false
+    activation_fn = 'ReLU'
+    extra_feature = false
+
+    [SSD.layer25]
+    type = 'conv2d'
+    name = 'conv9_2'
+    output_channel = 256
+    stride = 2
+    fileter_size = [3,3]
+    padding = 'SAME'
+    bn=false
+    activation_fn = 'ReLU'
+    extra_feature = true
+
+    [SSD.layer26]
+    type = 'conv2d'
+    name = 'conv10_1'
+    output_channel = 128
+    stride = 1
+    fileter_size = [1,1]
+    padding = 'SAME'
+    bn=false
+    activation_fn = 'ReLU'
+    extra_feature = false
+
+    [SSD.layer27]
+    type = 'conv2d'
+    name = 'conv10_2'
+    output_channel = 256
+    stride = 2
+    fileter_size = [3,3]
+    padding = 'SAME'
+    bn=false
+    activation_fn = 'ReLU'
+    extra_feature = true
+
+    [SSD.layer28]
+    type = 'conv2d'
+    name = 'conv11_1'
+    output_channel = 128
+    stride = 1
+    fileter_size = [1,1]
+    padding = 'SAME'
+    bn=false
+    activation_fn = 'ReLU'
+    extra_feature = false
+
+    [SSD.layer29]
+    type = 'conv2d'
+    name = 'conv11_2'
+    output_channel = 256
+    stride = 3
+    fileter_size = [3,3]
+    padding = 'SAME'
+    bn=false
+    activation_fn = 'ReLU'
+    extra_feature = true
+
+
+[ExtraFmap]
+    [ExtraFmap.network]
+    name = 'ExtraFeatureMap'
+    box_number = [4,6,6,6,6,6]
+    output_class = 21
+    model_start_key = 1
+
+    [ExtraFmap.layer1]
+    type = 'conv2d'
+    name = 'fmap1'
+    output_channel = 100 #nbox*(class_num+4)
+    stride = 1
+    fileter_size = [3,3]
+    padding = 'SAME'
+    bn=false
+    activation_fn = 'ReLU'
+
+    [ExtraFmap.layer2]
+    type = 'conv2d'
+    name = 'fmap2'
+    output_channel = 150 #nbox*(class_num+4)
+    stride = 1
+    fileter_size = [3,3]
+    padding = 'SAME'
+    bn=false
+    activation_fn = 'ReLU'
+
+    [ExtraFmap.layer3]
+    type = 'conv2d'
+    name = 'fmap3'
+    output_channel = 150 #nbox*(class_num+4)
+    stride = 1
+    fileter_size = [3,3]
+    padding = 'SAME'
+    bn=false
+    activation_fn = 'ReLU'
+
+    [ExtraFmap.layer4]
+    type = 'conv2d'
+    name = 'fmap4'
+    output_channel = 150 #nbox*(class_num+4)
+    stride = 1
+    fileter_size = [3,3]
+    padding = 'SAME'
+    bn=false
+    activation_fn = 'ReLU'
+
+    [ExtraFmap.layer5]
+    type = 'conv2d'
+    name = 'fmap5'
+    output_channel = 150 #nbox*(class_num+4)
+    stride = 1
+    fileter_size = [3,3]
+    padding = 'SAME'
+    bn=false
+    activation_fn = 'ReLU'
+
+    [ExtraFmap.layer6]
+    type = 'conv2d'
+    name = 'fmap6'
+    output_channel = 150 #nbox*(class_num+4)
+    stride = 1
+    fileter_size = [1,1]
+    padding = 'SAME'
+    bn=false
+    activation_fn = 'ReLU'
