@@ -46,13 +46,13 @@ class SSD(object):
 
         self._matcher = BBoxMatcher(n_classes=self._output_dim, default_box_set=self._default_boxes)
 
-    def set_network(self):
+    def _set_network(self):
         
         self.input = tf.compat.v1.placeholder(tf.float32, [None, self._image_height, self._image_width, self._image_channels])
 
         # ---------------------------------------------
         # confs = [None, default-bbox-numbers, class-numbers]
-        # locs  = [None, default-bbox-numbers, bbox-info] : (xmin, ymin, xmax, ymax)
+        # locs  = [None, default-bbox-numbers, bbox-info] : (center-x, center-y, width, height)
         # ---------------------------------------------
         self._fmaps, self._confs, self._locs = self._network.set_model(self.input, is_training=True, reuse=False) # train
 
@@ -105,15 +105,32 @@ class SSD(object):
         for i in range(len(input_images)):
             actual_labels = []
             actual_loc_rects = []
+            actual_loc_rects_ = []
             
             for obj in input_labels[i]:
-                actual_loc_rects.append(obj[:4])
-                actual_labels.append(np.argmax(obj[4:]))
+                loc_rect = obj[:4]
+                label = np.argmax( obj[4:] )
+
+                # convert location format
+                # [top_left_x, top_left_y, width, height] → [center_x, center_y, width, height]
+                width = loc_rect[2]-loc_rect[0]
+                height = loc_rect[3]-loc_rect[1]
+                loc_rect = np.array([loc_rect[0], loc_rect[1], width, height])
+
+                center_x = (2*loc_rect[0]+loc_rect[2])*0.5
+                center_y = (2*loc_rect[1]+loc_rect[3])*0.5
+                loc_rect = np.array([center_x, center_y, abs(loc_rect[2]), abs(loc_rect[3])])
+                        
+                actual_loc_rects.append(loc_rect)
+                actual_labels.append(label)
+                actual_loc_rects_.append(obj[:4])
+                #actual_labels.append(np.argmax(obj[4:]))
 
             pos_list, neg_list, expanded_gt_labels, expanded_gt_locs = self._matcher.match( 
                                                                                 confs[i], 
                                                                                 actual_labels, 
-                                                                                actual_loc_rects)
+                                                                                actual_loc_rects,
+                                                                                actual_loc_rects_)
             positives.append(pos_list)
             negatives.append(neg_list)
             ex_gt_labels.append(expanded_gt_labels)
@@ -139,7 +156,7 @@ class SSD(object):
         return np.squeeze(pred_confs), np.squeeze(pred_locs)  # remove extra dimension
 
 
-    def detect_objects(self, pred_confs, pred_locs, n_top_probs=200, prob_min=0.001, overlap_threshold=0.1):
+    def detect_objects(self, pred_confs, pred_locs, n_top_probs=200, prob_min=0.001, overlap_threshold=0.7):
         """
         this method returns detected objects list (means high confidences locs and its labels)
         """

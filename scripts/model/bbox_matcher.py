@@ -53,7 +53,15 @@ class BBoxMatcher(object):
         return indicies
 
 
-    def match(self, pred_confs, actual_labels, actual_locs):
+    def _generate_gt(self, gt_box, dbox):
+        gt_cx = (gt_box[0]-dbox[0])/dbox[2]
+        gt_cy = (gt_box[1]-dbox[1])/dbox[3]
+        gt_w = np.log(gt_box[2]/dbox[2])
+        gt_h = np.log(gt_box[3]/dbox[3])
+        return [gt_cx, gt_cy, gt_w, gt_h]
+
+
+    def match(self, pred_confs, actual_labels, actual_locs, actual_locs_2):
         """
         matching strategy
         """
@@ -72,18 +80,26 @@ class BBoxMatcher(object):
         # ---------------------------------------------
         # generate correct bounding box
         # ---------------------------------------------
-        for gt_label, gt_box in zip(actual_labels, actual_locs):
+        for gt_label, gt_box, gt_box_2 in zip(actual_labels, actual_locs, actual_locs_2):
 
             for i in range(len(bboxes_matched)):
-                dbox_rect = [self._default_boxes[i]._xmin, 
-                             self._default_boxes[i]._ymin,
-                             self._default_boxes[i]._xmax,
-                             self._default_boxes[i]._ymax]
+                dbox_rect_2 = [self._default_boxes[i]._xmin, 
+                               self._default_boxes[i]._ymin,
+                               self._default_boxes[i]._xmax,
+                               self._default_boxes[i]._ymax]
 
-                jacc = self.calc_jaccard(gt_box, dbox_rect)
+                jacc = self.calc_jaccard(gt_box_2, dbox_rect_2)
+
                 
                 if(jacc>=0.5):
-                    bboxes_matched[i]=BoundingBox(label=gt_label, rect_loc=gt_box)
+
+                    dbox_rect = [self._default_boxes[i]._center_x, 
+                                 self._default_boxes[i]._center_y,
+                                 self._default_boxes[i]._width,
+                                 self._default_boxes[i]._height]
+                    gt = self._generate_gt(gt_box, dbox_rect)
+
+                    bboxes_matched[i]=BoundingBox(label=gt_label, rect_loc=gt)
                     n_pos += 1
                     bboxes_label_matched.append(gt_label)
 
