@@ -3,3 +3,5 @@ scripts/model/tf_util/__pycache__/*
 logs/*
 result/*
 saved_model/*
+dataset/*
+scripts/utils/__pycache__/*

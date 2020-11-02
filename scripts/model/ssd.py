@@ -30,41 +30,39 @@ class _ssd_network(Layers):
 
 class SSD(object):
     
-    def __init__(self, param, config):
-        self.lr = param["lr"]
-        self.output_dim = param["output_class"]
-        self.image_width = param["image_width"]
-        self.image_height = param["image_height"]
-        self.image_channels = param["image_channels"]
+    def __init__(self, param, config, image_info):
+        self._lr = param["lr"]
+        self._output_dim = param["output_class"]
+        self._image_width, self._image_height, self._image_channels = image_info
 
-        self.network = _ssd_network([config["SSD"]["network"]["name"]], config)
-        self.box_generator = BoxGenerator(config["SSD"]["default_box"])
+        self._network = _ssd_network([config["SSD"]["network"]["name"]], config)
+        self._box_generator = BoxGenerator(config["SSD"]["default_box"])
 
     def set_model(self):
-        self.set_network()
-        self.default_boxes = self.box_generator.generate_boxes(self.fmaps)
-        self.set_loss()
-        self.set_optimizer()
+        self._set_network()
+        self._default_boxes = self._box_generator.generate_boxes(self._fmaps)
+        self._set_loss()
+        self._set_optimizer()
 
-        self._matcher = BBoxMatcher(n_classes=self.output_dim, default_box_set=self.default_boxes)
+        self._matcher = BBoxMatcher(n_classes=self._output_dim, default_box_set=self._default_boxes)
 
     def set_network(self):
         
-        self.input = tf.compat.v1.placeholder(tf.float32, [None, self.image_height, self.image_width, self.image_channels])
+        self.input = tf.compat.v1.placeholder(tf.float32, [None, self._image_height, self._image_width, self._image_channels])
 
         # ---------------------------------------------
         # confs = [None, default-bbox-numbers, class-numbers]
         # locs  = [None, default-bbox-numbers, bbox-info] : (xmin, ymin, xmax, ymax)
         # ---------------------------------------------
-        self.fmaps, self.confs, self.locs = self.network.set_model(self.input, is_training=True, reuse=False) # train
+        self._fmaps, self._confs, self._locs = self._network.set_model(self.input, is_training=True, reuse=False) # train
 
-        self.fmaps_wo, self.confs_wo, self.locs_wo = self.network.set_model(self.input, is_training=False, reuse=True) # inference
-        self.confs_wo_softmax = tf.nn.softmax(self.confs_wo)
+        self._fmaps_wo, self._confs_wo, self._locs_wo = self._network.set_model(self.input, is_training=False, reuse=True) # inference
+        self._confs_wo_softmax = tf.nn.softmax(self._confs_wo)
 
 
-    def set_loss(self):
+    def _set_loss(self):
 
-        total_boxes = len(self.default_boxes)
+        total_boxes = len(self._default_boxes)
         self.gt_labels_val = tf.compat.v1.placeholder(tf.int32, [None, total_boxes])
         self.gt_boxes_val = tf.compat.v1.placeholder(tf.float32, [None, total_boxes, 4])
         self.pos_val = tf.compat.v1.placeholder(tf.float32, [None, total_boxes])
@@ -73,7 +71,7 @@ class SSD(object):
         # ---------------------------------------------
         # L_loc = Σ_(i∈pos) Σ_(m) { x_ij^k * smoothL1( predbox_i^m - gtbox_j^m ) }
         # ---------------------------------------------
-        smoothL1_op = smooth_L1(self.gt_boxes_val-self.locs)
+        smoothL1_op = smooth_L1(self.gt_boxes_val-self._locs)
         loss_loc_op = tf.reduce_sum(smoothL1_op, reduction_indices=2)*self.pos_val
         loss_loc_op = tf.reduce_sum(loss_loc_op, reduction_indices=1)/(1e-5+tf.reduce_sum(self.pos_val, reduction_indices=1)) #average
 
@@ -81,7 +79,7 @@ class SSD(object):
         # L_conf = Σ_(i∈pos) { x_ij^k * log( softmax(c) ) }, c = category / label
         # ---------------------------------------------
         loss_conf_op = tf.nn.sparse_softmax_cross_entropy_with_logits( 
-                                                            logits=self.confs, 
+                                                            logits=self._confs, 
                                                             labels=self.gt_labels_val)
         loss_conf_op = loss_conf_op*(self.pos_val+self.neg_val)
         loss_conf_op = tf.reduce_sum(loss_conf_op, reduction_indices=1)/(1e-5+tf.reduce_sum((self.pos_val+self.neg_val), reduction_indices=1))
@@ -90,8 +88,8 @@ class SSD(object):
         self._loss_op = tf.reduce_sum(loss_conf_op+loss_loc_op)
 
 
-    def set_optimizer(self):
-        self._train_op = tf.compat.v1.train.AdamOptimizer(self.lr).minimize(self._loss_op)
+    def _set_optimizer(self):
+        self._train_op = tf.compat.v1.train.AdamOptimizer(self._lr).minimize(self._loss_op)
 
 
     def train(self, sess, input_images, input_labels):
@@ -102,7 +100,7 @@ class SSD(object):
         ex_gt_boxes = []
 
         feed_dict = {self.input: input_images}
-        _, confs, locs = sess.run([self.fmaps, self.confs, self.locs], feed_dict=feed_dict)
+        _, confs, locs = sess.run([self._fmaps, self._confs, self._locs], feed_dict=feed_dict)
 
         for i in range(len(input_images)):
             actual_labels = []
@@ -137,7 +135,7 @@ class SSD(object):
         """
 
         feed_dict = {self.input: [input_data]}
-        pred_confs, pred_locs = sess.run([self.confs_wo_softmax, self.locs_wo], feed_dict=feed_dict)
+        pred_confs, pred_locs = sess.run([self._confs_wo_softmax, self._locs_wo], feed_dict=feed_dict)
         return np.squeeze(pred_confs), np.squeeze(pred_locs)  # remove extra dimension
 
 

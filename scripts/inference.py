@@ -24,7 +24,7 @@ class Inferencer(object):
     
         self._data_loader = data_loader
         self._label_name = self._data_loader.get_label_name()
-        self._image_width, self._image_height = self._data_loader.get_image_info()
+        self._image_width, self._image_height, self._images_channel = self._data_loader.get_image_info()
 
         self._ssd = SSD(config["train"], ssd_config)
         self._ssd.set_model()
@@ -83,10 +83,10 @@ class Inferencer(object):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser( description='Process some integers' )
-    parser.add_argument( '--config', default="config/config.toml", type=str, help="default: config/config.toml")
+    parser.add_argument( '--config', default="config/testing_param.toml", type=str, help="default: config/testing_param.toml")
     args = parser.parse_args()
 
-    data_loader = VOC2007Dataset(toml.load(open("config/training_param.toml")))
+    data_loader = VOC2007Dataset(toml.load(open(args.config)))
 
-    inferencer = Inferencer(toml.load(open("config/training_param.toml")), data_loader)
+    inferencer = Inferencer(toml.load(open(args.config)), data_loader)
     inferencer.inference()

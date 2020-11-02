@@ -8,11 +8,11 @@ test_data_num = 300
 label_name = ["aeroplane", "bicycle", "bird", "boat", "bottle", "bus", "car", "cat", "chair", "cow", "diningtable", "dog", "horse", "motorbike", "person", "pottedplant", "sheep", "sofa", "train", "tvmonitor", "Unknown"]
 image_width = 300
 image_height = 300
-image_channels = 3
+image_channel = 3
 
 [train]
-batch_size = 50
-epoch = 1000
+batch_size = 10
+epoch = 200
 lr = 0.001
 val_step = 10
 use_gpu = true

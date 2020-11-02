@@ -29,7 +29,7 @@ class Trainer(object):
     
         self._data_loader = data_loader
 
-        self._ssd = SSD(config["train"], ssd_config)
+        self._ssd = SSD(config["train"], ssd_config, self._data_loader.get_image_info())
         self._ssd.set_model()
 
         if self._use_gpu:
@@ -96,10 +96,10 @@ class Trainer(object):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser( description='Process some integers' )
-    parser.add_argument( '--config', default="config/config.toml", type=str, help="default: config/config.toml")
+    parser.add_argument( '--config', default="config/training_param.toml", type=str, help="default: config/training_param.toml")
     args = parser.parse_args()
 
-    data_loader = VOC2007Dataset(toml.load(open("config/training_param.toml")))
+    data_loader = VOC2007Dataset(toml.load(open(args.config)))
 
-    trainer = Trainer(toml.load(open("config/training_param.toml")), data_loader)
+    trainer = Trainer(toml.load(open(args.config)), data_loader)
     trainer.train()

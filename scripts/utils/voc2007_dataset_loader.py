@@ -13,6 +13,7 @@ class VOC2007Dataset(object):
 
         self._image_width = config["dataset"]["image_width"]
         self._image_height = config["dataset"]["image_height"]
+        self._image_channel = config["dataset"]["image_channel"]
 
         self._load_dataset()
 
@@ -71,4 +72,4 @@ class VOC2007Dataset(object):
         return self._label_name
     
     def get_image_info(self):
-        return self._image_width, self._image_height
+        return self._image_width, self._image_height, self._image_channel
