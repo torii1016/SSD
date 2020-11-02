@@ -27,26 +27,19 @@ class DefaultBox(object):
         self._scale = scale
         self._aspect = aspect
 
+        self._xmin, self._ymin, self._xmax, self._ymax = self._convert_format([self._center_x, self._center_y, self._width, self._height])
 
-    def draw_rect(self, image, color=(0,0,255), thickness=1):
-        center_x = image.shape[0] * self._center_x - 0.5
-        center_y = image.shape[1] * self._center_y - 0.5
-        width = image.shape[0] * self._width * self._scale * (1 / np.sqrt( self._aspect ) )
-        height = image.shape[1] * self._height * self._scale * np.sqrt( self._aspect )
 
-        point1_x = int( center_x - width/2 )   # 長方形の左上 x 座標
-        point1_y = int( center_y - height/2 )  # 長方形の左上 y 座標
-        point2_x = int( center_x + width/2 )   # 長方形の右下 x 座標
-        point2_y = int( center_y + height/2 )  # 長方形の右下 y 座標
+    def _convert_format(self, inputs):
+        """
+        convert format from [center_x, center_y, width, height] to [top_left_x, top_left_y, bottom_right_x, bottom_right_y]
+        """
 
-        image = cv2.rectangle(
-                    img = image,
-                    pt1 = ( point1_x, point1_y ),  # 長方形の左上座標
-                    pt2 = ( point2_x, point2_y ),  # 長方形の右下座標
-                    color = color,                 # BGR
-                    thickness = thickness          # 線の太さ（-1 の場合、color で設定した色で塗りつぶし）
-                )
-        return image
+        rect = [inputs[0]-inputs[2]/2.0, inputs[1]-inputs[3]/2.0, inputs[0]+inputs[2]/2.0, inputs[1]+inputs[3]/2.0] #[top_left_x, top_left_y, bottom_right_x, bottom_right_y]
+        rect = [x if 0<=x else 0 for x in rect]     # exception process
+        rect = [x if x<=1.0 else 1.0 for x in rect] # exception process
+        return [rect[0], rect[1], rect[2], rect[3]]
+
 
 
 class BoxGenerator(object):
@@ -60,14 +53,14 @@ class BoxGenerator(object):
 
     def _calc_scale(self, k):
         return self._scale_min+(self._scale_max-self._scale_min)*(k-1.0)/(self._n_fmaps-1.0)
-    
-
-    def _calc_fmap_shape(self, fmaps):
-        return [fmap.get_shape().as_list() for fmap in fmaps]
 
 
     def generate_boxes(self, fmaps):
-        self._fmap_shapes = self._calc_fmap_shape(fmaps)
+        """
+        generate default boxes based on defined number
+        """
+
+        self._fmap_shapes = [fmap.get_shape().as_list() for fmap in fmaps]
 
         id = 0
         for k, map_shape in enumerate(self._fmap_shapes):
@@ -77,6 +70,9 @@ class BoxGenerator(object):
                 fmap_width  = self._fmap_shapes[k][1]
                 fmap_height = self._fmap_shapes[k][2]
 
+                # ---------------------------------------------
+                # generate bbox for each cell grid in the feature map
+                # ---------------------------------------------
                 for y in range(fmap_height):
                     center_y = (y+0.5)/float(fmap_height)
 

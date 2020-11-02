@@ -14,28 +14,33 @@ class BBoxMatcher(object):
 
 
     def calc_jaccard(self, rect1, rect2):
+        """
+        calculate the jaccard overlap for default box rect and gt box rect
+        """
 
+        #rect is defined as [top_left_x, top_left_y, bottom_right_x, bottom_right_y]
         def intersection(rect1, rect2):
             top = max(rect1[1], rect2[1])
             left = max(rect1[0], rect2[0])
-            right = min(rect1[0]+rect1[2], rect2[0]+rect2[2])
-            bottom = min(rect1[1]+rect1[3], rect2[1]+rect2[3])
+            right = min(rect1[2], rect2[2])
+            bottom = min(rect1[3], rect2[3])
 
             if bottom>top and right>left:
                 return (bottom-top)*(right-left)
             return 0
+        
+        s = (rect1[2]-rect1[0])*(rect1[3]-rect1[1])+(rect2[2]-rect2[0])*(rect2[3]-rect2[1])
 
-        rect1_ = [x if x>=0 else 0 for x in rect1]
-        rect2_ = [x if x>=0 else 0 for x in rect2]
-        s = rect1_[2]*rect1_[3]+rect2_[2]*rect2_[3]
-
-        intersect = intersection(rect1_, rect2_)
+        intersect = intersection(rect1, rect2)
         union = s-intersect
 
         return intersect/union
 
 
     def extract_highest_indicies(self, pred_confs, max_length):
+        """
+        extract specific indicies, that is, have most high loss_confs
+        """
 
         loss_confs = []
         for pred_conf in pred_confs:
@@ -48,7 +53,11 @@ class BBoxMatcher(object):
         return indicies
 
 
-    def match(self, pred_confs, pred_locs, actual_labels, actual_locs):
+    def match(self, pred_confs, actual_labels, actual_locs):
+        """
+        matching strategy
+        """
+
         n_pos = 0 
         n_neg = 0
         pos_list = []
@@ -57,17 +66,19 @@ class BBoxMatcher(object):
         expanded_gt_locs = []
         bboxes_matched = []
         bboxes_label_matched = []
-
         for i in range(len(self._default_boxes)):
             bboxes_matched.append(None)
 
+        # ---------------------------------------------
+        # generate correct bounding box
+        # ---------------------------------------------
         for gt_label, gt_box in zip(actual_labels, actual_locs):
 
             for i in range(len(bboxes_matched)):
-                dbox_rect = [self._default_boxes[i]._center_x, 
-                             self._default_boxes[i]._center_y,
-                             self._default_boxes[i]._height,
-                             self._default_boxes[i]._width]
+                dbox_rect = [self._default_boxes[i]._xmin, 
+                             self._default_boxes[i]._ymin,
+                             self._default_boxes[i]._xmax,
+                             self._default_boxes[i]._ymax]
 
                 jacc = self.calc_jaccard(gt_box, dbox_rect)
                 
@@ -77,6 +88,9 @@ class BBoxMatcher(object):
                     bboxes_label_matched.append(gt_label)
 
         
+        # ---------------------------------------------
+        # generate bounding box of non-applicable bbox
+        # ---------------------------------------------
         neg_pos = 5
         indicies = self.extract_highest_indicies(pred_confs, n_pos*neg_pos)
         for i in indicies:
@@ -85,9 +99,12 @@ class BBoxMatcher(object):
 
             if(bboxes_matched[i] is None and self._n_classes-1!=np.argmax(pred_confs[i])):
                 bboxes_matched[i] = BoundingBox(label=self._n_classes-1, rect_loc=[])
-
                 n_neg += 1
 
+
+        # ---------------------------------------------
+        # positive/negative judgment for the generated bbox
+        # ---------------------------------------------
         for box in bboxes_matched:
             if box is None:
                 pos_list.append(0)
@@ -107,8 +124,4 @@ class BBoxMatcher(object):
                 expanded_gt_labels.append(box._label)
                 expanded_gt_locs.append(box._rect_loc)
 
-
         return pos_list, neg_list, expanded_gt_labels, expanded_gt_locs
-
-
-

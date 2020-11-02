@@ -8,6 +8,7 @@ import tensorflow as tf
 from .tf_util import Layers, smooth_L1, SSDNetworkCreater, ExtraFeatureMapNetworkCreater
 from .bbox_matcher import BBoxMatcher
 from .default_box_generator import BoxGenerator
+from .non_maximum_suppression import non_maximum_suppression
 
 class _ssd_network(Layers):
     def __init__(self, name_scopes, config):
@@ -30,8 +31,6 @@ class _ssd_network(Layers):
 class SSD(object):
     
     def __init__(self, param, config):
-
-        self.batch_size = param["batch_size"]
         self.lr = param["lr"]
         self.output_dim = param["output_class"]
         self.image_width = param["image_width"]
@@ -39,7 +38,6 @@ class SSD(object):
         self.image_channels = param["image_channels"]
 
         self.network = _ssd_network([config["SSD"]["network"]["name"]], config)
-        
         self.box_generator = BoxGenerator(config["SSD"]["default_box"])
 
     def set_model(self):
@@ -52,12 +50,16 @@ class SSD(object):
 
     def set_network(self):
         
-        # -- place holder ---
         self.input = tf.compat.v1.placeholder(tf.float32, [None, self.image_height, self.image_width, self.image_channels])
 
-        # -- set network ---
-        self.fmaps, self.confs, self.locs = self.network.set_model(self.input, is_training=True, reuse=False)
-        self.fmaps_wo, self.confs_wo, self.locs_wo = self.network.set_model(self.input, is_training=False, reuse=True)
+        # ---------------------------------------------
+        # confs = [None, default-bbox-numbers, class-numbers]
+        # locs  = [None, default-bbox-numbers, bbox-info] : (xmin, ymin, xmax, ymax)
+        # ---------------------------------------------
+        self.fmaps, self.confs, self.locs = self.network.set_model(self.input, is_training=True, reuse=False) # train
+
+        self.fmaps_wo, self.confs_wo, self.locs_wo = self.network.set_model(self.input, is_training=False, reuse=True) # inference
+        self.confs_wo_softmax = tf.nn.softmax(self.confs_wo)
 
 
     def set_loss(self):
@@ -68,13 +70,16 @@ class SSD(object):
         self.pos_val = tf.compat.v1.placeholder(tf.float32, [None, total_boxes])
         self.neg_val = tf.compat.v1.placeholder(tf.float32, [None, total_boxes])
 
-
-        # Loss conf
+        # ---------------------------------------------
+        # L_loc = Σ_(i∈pos) Σ_(m) { x_ij^k * smoothL1( predbox_i^m - gtbox_j^m ) }
+        # ---------------------------------------------
         smoothL1_op = smooth_L1(self.gt_boxes_val-self.locs)
         loss_loc_op = tf.reduce_sum(smoothL1_op, reduction_indices=2)*self.pos_val
         loss_loc_op = tf.reduce_sum(loss_loc_op, reduction_indices=1)/(1e-5+tf.reduce_sum(self.pos_val, reduction_indices=1)) #average
 
-        # Loss loc
+        # ---------------------------------------------
+        # L_conf = Σ_(i∈pos) { x_ij^k * log( softmax(c) ) }, c = category / label
+        # ---------------------------------------------
         loss_conf_op = tf.nn.sparse_softmax_cross_entropy_with_logits( 
                                                             logits=self.confs, 
                                                             labels=self.gt_labels_val)
@@ -102,26 +107,13 @@ class SSD(object):
         for i in range(len(input_images)):
             actual_labels = []
             actual_loc_rects = []
-
+            
             for obj in input_labels[i]:
-                loc_rect = obj[:4]
-
-                label = np.argmax(obj[4:])
-
-                width = loc_rect[2]-loc_rect[0]
-                height = loc_rect[3]-loc_rect[1]
-                loc_rect = np.array([loc_rect[0], loc_rect[1], width, height])
-
-                center_x = (2*loc_rect[0]+loc_rect[2])*0.5
-                center_y = (2*loc_rect[1]+loc_rect[3])*0.5
-                loc_rect = np.array([center_x, center_y, abs(loc_rect[2]), abs(loc_rect[3])])
-
-                actual_loc_rects.append(loc_rect)
-                actual_labels.append(label)
+                actual_loc_rects.append(obj[:4])
+                actual_labels.append(np.argmax(obj[4:]))
 
             pos_list, neg_list, expanded_gt_labels, expanded_gt_locs = self._matcher.match( 
-                                                                                confs, 
-                                                                                locs, 
+                                                                                confs[i], 
                                                                                 actual_labels, 
                                                                                 actual_loc_rects)
             positives.append(pos_list)
@@ -134,11 +126,64 @@ class SSD(object):
                      self.neg_val: negatives,
                      self.gt_labels_val: ex_gt_labels,
                      self.gt_boxes_val: ex_gt_boxes}
-        loss, _, = sess.run([ self._loss_op, self._train_op ], feed_dict=feed_dict)
+        loss, _, = sess.run([self._loss_op, self._train_op], feed_dict=feed_dict)
 
         return _, loss
 
-    def get_output(self, sess, input_data):
-        feed_dict = {self.input: input_data}
-        _ = sess.run([self.fmaps_wo], feed_dict=feed_dict)
-        return _
+
+    def inference(self, sess, input_data):
+        """
+        this method returns inference results (pred-confs and locs)
+        """
+
+        feed_dict = {self.input: [input_data]}
+        pred_confs, pred_locs = sess.run([self.confs_wo_softmax, self.locs_wo], feed_dict=feed_dict)
+        return np.squeeze(pred_confs), np.squeeze(pred_locs)  # remove extra dimension
+
+
+    def detect_objects(self, pred_confs, pred_locs, n_top_probs=200, prob_min=0.001, overlap_threshold=0.1):
+        """
+        this method returns detected objects list (means high confidences locs and its labels)
+        """
+
+        # ---------------------------------------------
+        # extract maximum class possibility
+        # ---------------------------------------------
+        possibilities = [np.amax(conf) for conf in pred_confs]
+
+        # ---------------------------------------------
+        # extract the top 200 with the highest possibility value
+        # ---------------------------------------------
+        indicies = np.argpartition(possibilities, -n_top_probs)[-n_top_probs:]
+        top200 = np.asarray(possibilities)[indicies]
+
+        # ---------------------------------------------
+        # exclude candidates with a possibility value below the threshold
+        # ---------------------------------------------
+        slicer = indicies[prob_min<top200]
+
+        # ---------------------------------------------
+        # exception process
+        # ---------------------------------------------
+        locations = pred_locs[slicer]
+        locations = np.delete(locations, locations[:,2]==0, 0)  # exception process
+        locations = np.delete(locations, locations[:,3]==0, 0)  # exception process
+
+        labels = []
+        for conf in pred_confs[slicer]:
+            labels.append(np.argmax(conf))
+        labels = np.asarray(labels).reshape(len(labels), 1)
+
+        # ---------------------------------------------
+        # non-maximum suppression
+        # ---------------------------------------------
+        filtered_locs, filtered_labels = non_maximum_suppression(boxes=locations, labels=labels, overlap_threshold=overlap_threshold)
+
+        # ---------------------------------------------
+        # exception process
+        # ---------------------------------------------
+        if len(filtered_locs)==0:
+            filtered_locs = np.zeros((4, 4))
+            filtered_labels = np.zeros((4, 1))
+
+        return filtered_locs, filtered_labels
