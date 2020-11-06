@@ -11,12 +11,12 @@ image_height = 300
 image_channels = 3
 
 [test]
-lr = 0.001
+lr = 0.001 
 val_step = 10
 use_gpu = true
 output_class = 21
 save_model_path = "saved_model"
 save_model_name = "model.dump"
 top_number = 200
-prob_min = 0.001
-overlap_threshold = 0.9
+prob_min = 0.1
+overlap_threshold = 0.1

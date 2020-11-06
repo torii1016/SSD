@@ -4,6 +4,7 @@ import os
 import sys
 import numpy as np
 import tensorflow as tf
+import cv2
 
 from .tf_util import Layers, smooth_L1, SSDNetworkCreater, ExtraFeatureMapNetworkCreater
 from .bbox_matcher import BBoxMatcher
@@ -30,13 +31,14 @@ class _ssd_network(Layers):
 
 class SSD(object):
     
-    def __init__(self, param, config, image_info):
+    def __init__(self, param, config, image_info, label_name=None):
         self._lr = param["lr"]
         self._output_dim = param["output_class"]
         self._image_width, self._image_height, self._image_channels = image_info
 
         self._network = _ssd_network([config["SSD"]["network"]["name"]], config)
         self._box_generator = BoxGenerator(config["SSD"]["default_box"])
+        self._label_name = label_name
 
     def set_model(self):
         self._set_network()
@@ -44,7 +46,17 @@ class SSD(object):
         self._set_loss()
         self._set_optimizer()
 
-        self._matcher = BBoxMatcher(n_classes=self._output_dim, default_box_set=self._default_boxes)
+        self._matcher = BBoxMatcher(n_classes=self._output_dim, 
+                                    default_box_set=self._default_boxes,
+                                    image_width = self._image_width,
+                                    image_height = self._image_height)
+
+        """
+        image = np.zeros([300,300,3])
+        for i in range(len(self._default_boxes)):
+            image = self._default_boxes[i].draw_rect(image)
+        cv2.imwrite("image.png", image)
+        """
 
     def _set_network(self):
         
@@ -71,25 +83,26 @@ class SSD(object):
         # ---------------------------------------------
         # L_loc = Σ_(i∈pos) Σ_(m) { x_ij^k * smoothL1( predbox_i^m - gtbox_j^m ) }
         # ---------------------------------------------
-        smoothL1_op = smooth_L1(self.gt_boxes_val-self._locs)
-        loss_loc_op = tf.reduce_sum(smoothL1_op, reduction_indices=2)*self.pos_val
-        loss_loc_op = tf.reduce_sum(loss_loc_op, reduction_indices=1)/(1e-5+tf.reduce_sum(self.pos_val, reduction_indices=1)) #average
+        smoothL1_op = smooth_L1(self.gt_boxes_val-self._locs)                           # loss = [batch-size, default-boxes, 4]
+        loss_loc_op_ = tf.reduce_sum(smoothL1_op, reduction_indices=2)*self.pos_val     # loss = [batch-size, default-boxes]
+        self._loss_loc_op = tf.reduce_sum(tf.reduce_sum(loss_loc_op_, reduction_indices=1)/(1e-5+tf.reduce_sum(self.pos_val, reduction_indices=1))) #average
 
         # ---------------------------------------------
         # L_conf = Σ_(i∈pos) { x_ij^k * log( softmax(c) ) }, c = category / label
         # ---------------------------------------------
-        loss_conf_op = tf.nn.sparse_softmax_cross_entropy_with_logits( 
+        loss_conf_op_ = tf.nn.sparse_softmax_cross_entropy_with_logits( 
                                                             logits=self._confs, 
                                                             labels=self.gt_labels_val)
-        loss_conf_op = loss_conf_op*(self.pos_val+self.neg_val)
-        loss_conf_op = tf.reduce_sum(loss_conf_op, reduction_indices=1)/(1e-5+tf.reduce_sum((self.pos_val+self.neg_val), reduction_indices=1))
+        loss_conf_op_ = loss_conf_op_*(self.pos_val+self.neg_val)
+        self._loss_conf_op = tf.reduce_sum(tf.reduce_sum(loss_conf_op_, reduction_indices=1)/(1e-5+tf.reduce_sum((self.pos_val+self.neg_val), reduction_indices=1)))
 
         # Loss
-        self._loss_op = tf.reduce_sum(loss_conf_op+loss_loc_op)
+        self._loss_op = tf.add(self._loss_conf_op, self._loss_loc_op)
 
 
     def _set_optimizer(self):
-        self._train_op = tf.compat.v1.train.AdamOptimizer(self._lr).minimize(self._loss_op)
+        #self._train_op = tf.compat.v1.train.AdamOptimizer(self._lr).minimize(self._loss_op, var_list = self._network.get_variables())
+        self._train_op = tf.compat.v1.train.RMSPropOptimizer(self._lr).minimize(self._loss_op, var_list=self._network.get_variables())
 
 
     def train(self, sess, input_images, input_labels):
@@ -106,44 +119,86 @@ class SSD(object):
             actual_labels = []
             actual_loc_rects = []
             actual_loc_rects_ = []
+
+            image = input_images[i]*255
             
             for obj in input_labels[i]:
                 loc_rect = obj[:4]
-                label = np.argmax( obj[4:] )
+                label = np.argmax(obj[4:])
 
+                # ---------------------------------------------
                 # convert location format
-                # [top_left_x, top_left_y, width, height] → [center_x, center_y, width, height]
+                # [xmin, ymin, xmax, ymax] → [center_x, center_y, width, height]
+                # ---------------------------------------------
                 width = loc_rect[2]-loc_rect[0]
                 height = loc_rect[3]-loc_rect[1]
                 loc_rect = np.array([loc_rect[0], loc_rect[1], width, height])
 
-                center_x = (2*loc_rect[0]+loc_rect[2])*0.5
-                center_y = (2*loc_rect[1]+loc_rect[3])*0.5
+                #center_x = (2*loc_rect[0]+loc_rect[2])*0.5
+                #center_y = (2*loc_rect[1]+loc_rect[3])*0.5
+                center_x = loc_rect[0]+loc_rect[2]*0.5
+                center_y = loc_rect[1]+loc_rect[3]*0.5
                 loc_rect = np.array([center_x, center_y, abs(loc_rect[2]), abs(loc_rect[3])])
                         
-                actual_loc_rects.append(loc_rect)
+                actual_loc_rects.append(loc_rect) # [center_x, center_y, width, height]
+                actual_loc_rects_.append(obj[:4]) # [xmin, ymin, xmax, ymax]
                 actual_labels.append(label)
-                actual_loc_rects_.append(obj[:4])
-                #actual_labels.append(np.argmax(obj[4:]))
+
+                """
+                image = cv2.rectangle(image, (int(obj[0]*300), int(obj[1]*300)), (int(obj[2]*300), int(obj[3]*300)), (0,255,0))
+                cv2.putText(image, 
+                            str(self._label_name[int(label)]), 
+                            (int(obj[0]*300), int(obj[1]*300)), 
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            0.5, (0, 0, 255), 1)
+                """
+
+
 
             pos_list, neg_list, expanded_gt_labels, expanded_gt_locs = self._matcher.match( 
                                                                                 confs[i], 
                                                                                 actual_labels, 
                                                                                 actual_loc_rects,
                                                                                 actual_loc_rects_)
+            """
+            #cv2.imwrite("image_{}_gt.png".format(i), image)
+            #image = input_images[i]*255
+            """
+
             positives.append(pos_list)
             negatives.append(neg_list)
             ex_gt_labels.append(expanded_gt_labels)
             ex_gt_boxes.append(expanded_gt_locs)
+
+            """
+            for k in range(len(pos_list)):
+                if pos_list[k]==1:
+                    xmin, ymin, xmax, ymax = self._default_boxes[k].get_bbox_info(self._image_width,
+                                                                                  self._image_height,
+                                                                                  center_x=self._default_boxes[k]._center_x,
+                                                                                  center_y=self._default_boxes[k]._center_y,
+                                                                                  width=self._default_boxes[k]._width,
+                                                                                  height=self._default_boxes[k]._height)
+
+                    image = cv2.rectangle(image, (xmin, ymin), (xmax, ymax), (255,0,0))
+            cv2.imwrite("image_{}.png".format(i), image)
+            """
+        
 
         feed_dict = {self.input: input_images,
                      self.pos_val: positives,
                      self.neg_val: negatives,
                      self.gt_labels_val: ex_gt_labels,
                      self.gt_boxes_val: ex_gt_boxes}
-        loss, _, = sess.run([self._loss_op, self._train_op], feed_dict=feed_dict)
+        loss, _, loss_conf, loss_loc = sess.run([self._loss_op, self._train_op, self._loss_conf_op, self._loss_loc_op], feed_dict=feed_dict)
 
-        return _, loss
+        #w = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="SSD/biasesfmap6")[0]
+        #print("weight:{}".format(w))
+        #print("weight:{}".format(w.eval(session=sess)))
+        #print("weight:{}".format(self._network.get_variables()))
+
+
+        return _, loss, loss_conf, loss_loc
 
 
     def inference(self, sess, input_data):
@@ -162,37 +217,50 @@ class SSD(object):
         """
 
         # ---------------------------------------------
-        # extract maximum class possibility
+        # extract maximum class possibility, bbox width/height
         # ---------------------------------------------
         possibilities = [np.amax(conf) for conf in pred_confs]
 
         # ---------------------------------------------
         # extract the top 200 with the highest possibility value
         # ---------------------------------------------
-        indicies = np.argpartition(possibilities, -n_top_probs)[-n_top_probs:]
-        top200 = np.asarray(possibilities)[indicies]
+        indicies = np.argpartition(possibilities, -n_top_probs)[-n_top_probs:] # index
+        top200 = np.asarray(possibilities)[indicies] # value
+        print("top200:{}".format(top200))
 
         # ---------------------------------------------
         # exclude candidates with a possibility value below the threshold
         # ---------------------------------------------
-        slicer = indicies[prob_min<top200]
+        slicer = indicies[prob_min<top200] # index
 
-        # ---------------------------------------------
-        # exception process
-        # ---------------------------------------------
-        locations = pred_locs[slicer]
-        locations = np.delete(locations, locations[:,2]==0, 0)  # exception process
-        locations = np.delete(locations, locations[:,3]==0, 0)  # exception process
 
-        labels = []
-        for conf in pred_confs[slicer]:
-            labels.append(np.argmax(conf))
+        def generate_bbox(dboxs, offsets):
+            rects = []
+            for dbox, offset in zip(dboxs, offsets):
+                xmin, ymin, xmax, ymax = dbox.get_bbox_info(self._image_width,
+                                                            self._image_height,
+                                                            center_x=[dbox._center_x, offset[0]],
+                                                            center_y=[dbox._center_y, offset[1]],
+                                                            width=[dbox._width, np.exp(offset[2])],
+                                                            height=[dbox._height, np.exp(offset[3])])
+                rects.append([xmin, ymin, xmax, ymax])
+            return np.array(rects)
+
+        default_box = [self._default_boxes[i] for i in slicer]
+        locations = generate_bbox(default_box, pred_locs[slicer])
+
+
+        labels = [np.argmax(conf) for conf in pred_confs[slicer]]
         labels = np.asarray(labels).reshape(len(labels), 1)
 
         # ---------------------------------------------
         # non-maximum suppression
         # ---------------------------------------------
-        filtered_locs, filtered_labels = non_maximum_suppression(boxes=locations, labels=labels, overlap_threshold=overlap_threshold)
+        index = non_maximum_suppression(boxes=locations, labels=labels, overlap_threshold=overlap_threshold)
+
+        filtered_locs = locations[index]
+        filtered_labels = labels[index]
+
 
         # ---------------------------------------------
         # exception process
@@ -200,5 +268,5 @@ class SSD(object):
         if len(filtered_locs)==0:
             filtered_locs = np.zeros((4, 4))
             filtered_labels = np.zeros((4, 1))
-
+        
         return filtered_locs, filtered_labels

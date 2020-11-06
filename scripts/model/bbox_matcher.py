@@ -8,9 +8,11 @@ from .bounding_box import BoundingBox
 
 
 class BBoxMatcher(object):
-    def __init__(self, n_classes, default_box_set):
+    def __init__(self, n_classes, default_box_set, image_width, image_height):
         self._n_classes = n_classes
         self._default_boxes = default_box_set
+        self._image_width = image_width
+        self._image_height = image_height
 
 
     def calc_jaccard(self, rect1, rect2):
@@ -18,7 +20,10 @@ class BBoxMatcher(object):
         calculate the jaccard overlap for default box rect and gt box rect
         """
 
-        #rect is defined as [top_left_x, top_left_y, bottom_right_x, bottom_right_y]
+        #print("rect1:{}".format(rect1))
+        #print("rect2:{}".format(rect2))
+
+        #rect is defined as [xmin, ymin, xmax, ymax]
         def intersection(rect1, rect2):
             top = max(rect1[1], rect2[1])
             left = max(rect1[0], rect2[0])
@@ -64,6 +69,12 @@ class BBoxMatcher(object):
     def match(self, pred_confs, actual_labels, actual_locs, actual_locs_2):
         """
         matching strategy
+
+        [Input]
+            pred_confs    : [default-box-number][class-number]
+            actual_labels : [gt-box-number][label-id]
+            actual_locs   : [gt-box-number][center_x, center_y, width, height]
+            actual_locs_2 : [gt-box-number][xmin, ymin, xmax, ymax]
         """
 
         n_pos = 0 
@@ -83,12 +94,23 @@ class BBoxMatcher(object):
         for gt_label, gt_box, gt_box_2 in zip(actual_labels, actual_locs, actual_locs_2):
 
             for i in range(len(bboxes_matched)):
-                dbox_rect_2 = [self._default_boxes[i]._xmin, 
-                               self._default_boxes[i]._ymin,
-                               self._default_boxes[i]._xmax,
-                               self._default_boxes[i]._ymax]
+                #dbox_rect_2 = [self._default_boxes[i]._xmin, 
+                #               self._default_boxes[i]._ymin,
+                #               self._default_boxes[i]._xmax,
+                #               self._default_boxes[i]._ymax]
+                xmin, ymin, xmax, ymax = self._default_boxes[i].get_bbox_info(self._image_width,
+                                                                              self._image_height,
+                                                                              center_x=self._default_boxes[i]._center_x,
+                                                                              center_y=self._default_boxes[i]._center_y,
+                                                                              width=self._default_boxes[i]._width,
+                                                                              height=self._default_boxes[i]._height)
+                
+                gt_box_2_ = [gt_box_2[0]*self._image_width, 
+                            gt_box_2[1]*self._image_height,
+                            gt_box_2[2]*self._image_width,
+                            gt_box_2[3]*self._image_height]
 
-                jacc = self.calc_jaccard(gt_box_2, dbox_rect_2)
+                jacc = self.calc_jaccard(gt_box_2_, [xmin, ymin, xmax, ymax])
 
                 
                 if(jacc>=0.5):
@@ -98,6 +120,9 @@ class BBoxMatcher(object):
                                  self._default_boxes[i]._width,
                                  self._default_boxes[i]._height]
                     gt = self._generate_gt(gt_box, dbox_rect)
+                    #print("dbox_rect:{}".format(dbox_rect))
+                    #print("gt_box:{}".format(gt_box))
+                    #print("gt:{}".format(gt))
 
                     bboxes_matched[i]=BoundingBox(label=gt_label, rect_loc=gt)
                     n_pos += 1
@@ -107,7 +132,7 @@ class BBoxMatcher(object):
         # ---------------------------------------------
         # generate bounding box of non-applicable bbox
         # ---------------------------------------------
-        neg_pos = 5
+        neg_pos = 3
         indicies = self.extract_highest_indicies(pred_confs, n_pos*neg_pos)
         for i in indicies:
             if(n_neg>n_pos*neg_pos):

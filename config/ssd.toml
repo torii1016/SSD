@@ -318,7 +318,7 @@
     fileter_size = [3,3]
     padding = 'SAME'
     bn=false
-    activation_fn = 'ReLU'
+    activation_fn = 'None'
 
     [ExtraFmap.layer2]
     type = 'conv2d'
@@ -328,7 +328,7 @@
     fileter_size = [3,3]
     padding = 'SAME'
     bn=false
-    activation_fn = 'ReLU'
+    activation_fn = 'None'
 
     [ExtraFmap.layer3]
     type = 'conv2d'
@@ -338,7 +338,7 @@
     fileter_size = [3,3]
     padding = 'SAME'
     bn=false
-    activation_fn = 'ReLU'
+    activation_fn = 'None'
 
     [ExtraFmap.layer4]
     type = 'conv2d'
@@ -348,7 +348,7 @@
     fileter_size = [3,3]
     padding = 'SAME'
     bn=false
-    activation_fn = 'ReLU'
+    activation_fn = 'None'
 
     [ExtraFmap.layer5]
     type = 'conv2d'
@@ -358,7 +358,7 @@
     fileter_size = [3,3]
     padding = 'SAME'
     bn=false
-    activation_fn = 'ReLU'
+    activation_fn = 'None'
 
     [ExtraFmap.layer6]
     type = 'conv2d'
@@ -368,4 +368,4 @@
     fileter_size = [1,1]
     padding = 'SAME'
     bn=false
-    activation_fn = 'ReLU'
+    activation_fn = 'None'

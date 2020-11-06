@@ -55,16 +55,17 @@ class Inferencer(object):
         image = cv2.resize(image, (self._image_width, self._image_height))
         if len(labels) and len(locs):
             for label, loc in zip(labels, locs):
+
                 loc = np.array([loc[0], loc[1], loc[2], loc[3]])
 
                 cv2.rectangle(image, 
-                                (int(loc[0]*self._image_width), int(loc[1]*self._image_height)), 
-                                (int(loc[2]*self._image_width), int(loc[3]*self._image_height)), 
+                                (int(loc[0]), int(loc[1])), 
+                                (int(loc[2]), int(loc[3])), 
                                 (0, 0, 255), 1)
 
                 cv2.putText(image, 
                             str(self._label_name[int(label)]), 
-                            (int(loc[0]*self._image_width), int(loc[1]*self._image_height)), 
+                            (int(loc[0]), int(loc[1])), 
                             cv2.FONT_HERSHEY_SIMPLEX,
                             0.5, (0, 0, 255), 1)
         cv2.imwrite( "./result/test_{}.jpg".format(num), image )
@@ -77,12 +78,12 @@ class Inferencer(object):
         for image, label in zip(input_images, input_labels):
             pred_confs, pred_locs = self._ssd.inference(self._sess, image)
             locs, labels = self._ssd.detect_objects(pred_confs, pred_locs, self._n_top, self._prob_min, self._overlap_th)
-            print("pred_locs:{}".format(pred_locs))
-            print("locs:{}, labels".format(locs, labels))
+            #print("pred_locs:{}".format(pred_locs))
+            #print("locs:{}, labels{}".format(locs, labels))
 
             self._save_result(image, locs, labels, num)
             num += 1
-            if num==5:
+            if num==1:
                 return 0
 
 

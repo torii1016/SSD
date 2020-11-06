@@ -28,8 +28,9 @@ class Trainer(object):
         self._save_model_name = config["train"]["save_model_name"]
     
         self._data_loader = data_loader
+        self._label_name = self._data_loader.get_label_name()
 
-        self._ssd = SSD(config["train"], ssd_config, self._data_loader.get_image_info())
+        self._ssd = SSD(config["train"], ssd_config, self._data_loader.get_image_info(), self._label_name)
         self._ssd.set_model()
 
         if self._use_gpu:
@@ -65,7 +66,7 @@ class Trainer(object):
         ax.plot(range(len(self._loss)), self._loss, color="b")
         ax.set_xlabel("episode")
         ax.set_ylabel("loss")
-        ax.set_ylim(0, 200)
+        ax.set_ylim(0, 50)
         ax.grid()
         plt.savefig("logs/loss.png")
 
@@ -79,11 +80,16 @@ class Trainer(object):
 
     def train(self):
         with tqdm(range(self._epoch)) as pbar:
+            #input_images, input_labels = self._data_loader.get_train_data(self._batch_size)
+            input_images, input_labels = self._data_loader.get_test_data()
+            input_images = input_images[:1]
+            input_labels = input_labels[:1]
             for i, ch in enumerate(pbar): #train
-                input_images, input_labels = self._data_loader.get_train_data(self._batch_size)
+                #input_images, input_labels = self._data_loader.get_train_data(self._batch_size)
 
-                _, loss = self._ssd.train(self._sess, input_images, input_labels)
-                pbar.set_postfix(OrderedDict(loss=loss, accuracy=self._accuracy))
+                _, loss, loss_conf, loss_loc = self._ssd.train(self._sess, input_images, input_labels)
+                pbar.set_postfix(OrderedDict(loss=loss, loss_conf=loss_conf, loss_loc=loss_loc))
+                #print("loss:{} [loss_conf:{}, loss_loc:{}]".format(loss, loss_conf, loss_loc))
 
                 #self._save_tensorboard(loss)
                 self._loss.append(loss)

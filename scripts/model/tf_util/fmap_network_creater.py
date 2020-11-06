@@ -42,6 +42,6 @@ class ExtraFeatureMapNetworkCreater(NetworkCreater):
         fmap_concatenated = tf.concat(fmaps_reshaped, axis=1)
 
         self.pred_confs = fmap_concatenated[:, :, :self._n_classes] # shape = [None, None, 21] | 21: class num
-        self.pred_locs = fmap_concatenated[:, :, self._n_classes:] # shape = [None, None, 4]  | 4 : (xmin, ymin, xmax, ymax) の bounding box info
+        self.pred_locs = fmap_concatenated[:, :, self._n_classes:] # shape = [None, None, 4]  | 4 : (center-x, center-y, width, height) の bounding box info
 
         return self._fmaps, self.pred_confs, self.pred_locs

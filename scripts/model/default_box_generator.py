@@ -41,6 +41,60 @@ class DefaultBox(object):
         return [rect[0], rect[1], rect[2], rect[3]]
 
 
+    def draw_rect(self, image, color=(0,255,0), thickness=1):
+        """
+        draw the default bounding box
+        """
+
+        point1_x, point1_y, point2_x, point2_y = self.get_bbox_info(image_width=image.shape[0],
+                                                                    image_height=image.shape[1],
+                                                                    center_x=self._center_x,
+                                                                    center_y=self._center_y,
+                                                                    width=self._width,
+                                                                    height=self._height)
+        image = cv2.rectangle(img=image,
+                              pt1=(point1_x, point1_y),
+                              pt2=(point2_x, point2_y),
+                              color=color,
+                              thickness=thickness)
+
+        return image
+    
+
+    def get_bbox_info(self, image_width, image_height, center_x, center_y, width, height):
+
+        box_center_x = image_width*center_x[0]-0.5
+        box_center_y = image_height*center_y[0]-0.5
+        box_width = image_width*width[0]*self._scale*(1/np.sqrt(self._aspect))
+        box_height = image_height*height[0]*self._scale*np.sqrt(self._aspect)
+
+        real_center_x = box_center_x+image_width*center_x[1]
+        real_center_y = box_center_y+image_height*center_y[1]
+        real_width = box_width*width[1]
+        real_height = box_height*height[1]
+
+        xmin = int(real_center_x-real_width/2) 
+        ymin = int(real_center_y-real_height/2)
+        xmax = int(real_center_x+real_width/2)
+        ymax = int(real_center_y+real_height/2)
+
+
+        def exception_process(x, min_x, max_x):
+            if x<min_x:
+                return min_x
+            elif max_x<x:
+                return max_x
+            else:
+                return x
+        
+        xmin = exception_process(xmin, min_x=0, max_x=image_width-1)
+        xmax = exception_process(xmax, min_x=0, max_x=image_width-1)
+        ymin = exception_process(ymin, min_x=0, max_x=image_height-1)
+        ymax = exception_process(ymax, min_x=0, max_x=image_height-1)
+
+        return xmin, ymin, xmax, ymax
+
+
 
 class BoxGenerator(object):
     def __init__(self, config):

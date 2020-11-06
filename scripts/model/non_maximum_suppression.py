@@ -61,4 +61,4 @@ def non_maximum_suppression(boxes, labels, overlap_threshold=0.7):
         # ---------------------------------------------
         idxs = np.delete(idxs, suppress)
 
-    return boxes[picked], labels[picked]
+    return picked
