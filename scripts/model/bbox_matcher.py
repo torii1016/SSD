@@ -94,35 +94,21 @@ class BBoxMatcher(object):
         for gt_label, gt_box, gt_box_2 in zip(actual_labels, actual_locs, actual_locs_2):
 
             for i in range(len(bboxes_matched)):
-                #dbox_rect_2 = [self._default_boxes[i]._xmin, 
-                #               self._default_boxes[i]._ymin,
-                #               self._default_boxes[i]._xmax,
-                #               self._default_boxes[i]._ymax]
-                xmin, ymin, xmax, ymax = self._default_boxes[i].get_bbox_info(self._image_width,
+                [xmin, ymin, xmax, ymax], [center_x, center_y, width, height] = self._default_boxes[i].get_bbox_info(
+                                                                              self._image_width,
                                                                               self._image_height,
-                                                                              center_x=self._default_boxes[i]._center_x,
-                                                                              center_y=self._default_boxes[i]._center_y,
-                                                                              width=self._default_boxes[i]._width,
-                                                                              height=self._default_boxes[i]._height)
+                                                                              center_x={"bbox":self._default_boxes[i]._center_x, "offset":0.0},
+                                                                              center_y={"bbox":self._default_boxes[i]._center_y, "offset":0.0},
+                                                                              width=   {"bbox":self._default_boxes[i]._width,    "offset":1.0},
+                                                                              height=  {"bbox":self._default_boxes[i]._height,   "offset":1.0})
                 
-                gt_box_2_ = [gt_box_2[0]*self._image_width, 
-                            gt_box_2[1]*self._image_height,
-                            gt_box_2[2]*self._image_width,
-                            gt_box_2[3]*self._image_height]
 
-                jacc = self.calc_jaccard(gt_box_2_, [xmin, ymin, xmax, ymax])
+                jacc = self.calc_jaccard(gt_box_2, [xmin, ymin, xmax, ymax])
 
                 
                 if(jacc>=0.5):
-
-                    dbox_rect = [self._default_boxes[i]._center_x, 
-                                 self._default_boxes[i]._center_y,
-                                 self._default_boxes[i]._width,
-                                 self._default_boxes[i]._height]
+                    dbox_rect = [center_x, center_y, width, height]
                     gt = self._generate_gt(gt_box, dbox_rect)
-                    #print("dbox_rect:{}".format(dbox_rect))
-                    #print("gt_box:{}".format(gt_box))
-                    #print("gt:{}".format(gt))
 
                     bboxes_matched[i]=BoundingBox(label=gt_label, rect_loc=gt)
                     n_pos += 1

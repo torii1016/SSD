@@ -5,6 +5,7 @@ import sys
 import numpy as np
 import tensorflow as tf
 import cv2
+import pickle
 
 from .tf_util import Layers, smooth_L1, SSDNetworkCreater, ExtraFeatureMapNetworkCreater
 from .bbox_matcher import BBoxMatcher
@@ -39,6 +40,8 @@ class SSD(object):
         self._network = _ssd_network([config["SSD"]["network"]["name"]], config)
         self._box_generator = BoxGenerator(config["SSD"]["default_box"])
         self._label_name = label_name
+        self._num = 0
+        self._loss_old = None
 
     def set_model(self):
         self._set_network()
@@ -123,36 +126,26 @@ class SSD(object):
             image = input_images[i]*255
             
             for obj in input_labels[i]:
-                loc_rect = obj[:4]
+                loc_rect_type1 = [obj[0]*self._image_width, obj[1]*self._image_height, obj[2]*self._image_width, obj[3]*self._image_height]
                 label = np.argmax(obj[4:])
 
                 # ---------------------------------------------
                 # convert location format
                 # [xmin, ymin, xmax, ymax] → [center_x, center_y, width, height]
                 # ---------------------------------------------
-                width = loc_rect[2]-loc_rect[0]
-                height = loc_rect[3]-loc_rect[1]
-                loc_rect = np.array([loc_rect[0], loc_rect[1], width, height])
+                width = loc_rect_type1[2]-loc_rect_type1[0]
+                height = loc_rect_type1[3]-loc_rect_type1[1]
 
-                #center_x = (2*loc_rect[0]+loc_rect[2])*0.5
-                #center_y = (2*loc_rect[1]+loc_rect[3])*0.5
-                center_x = loc_rect[0]+loc_rect[2]*0.5
-                center_y = loc_rect[1]+loc_rect[3]*0.5
-                loc_rect = np.array([center_x, center_y, abs(loc_rect[2]), abs(loc_rect[3])])
+                # [xmin, ymin, xmax, ymax] → [xmin, ymin, width, height]
+                loc_rect_type2 = np.array([loc_rect_type1[0], loc_rect_type1[1], width, height])
+
+                center_x = loc_rect_type2[0]+loc_rect_type2[2]*0.5
+                center_y = loc_rect_type2[1]+loc_rect_type2[3]*0.5
+                loc_rect_type2 = np.array([center_x, center_y, abs(loc_rect_type2[2]), abs(loc_rect_type2[3])])
                         
-                actual_loc_rects.append(loc_rect) # [center_x, center_y, width, height]
-                actual_loc_rects_.append(obj[:4]) # [xmin, ymin, xmax, ymax]
+                actual_loc_rects.append(loc_rect_type2) # [center_x, center_y, width, height]
+                actual_loc_rects_.append(loc_rect_type1) # [xmin, ymin, xmax, ymax]
                 actual_labels.append(label)
-
-                """
-                image = cv2.rectangle(image, (int(obj[0]*300), int(obj[1]*300)), (int(obj[2]*300), int(obj[3]*300)), (0,255,0))
-                cv2.putText(image, 
-                            str(self._label_name[int(label)]), 
-                            (int(obj[0]*300), int(obj[1]*300)), 
-                            cv2.FONT_HERSHEY_SIMPLEX,
-                            0.5, (0, 0, 255), 1)
-                """
-
 
 
             pos_list, neg_list, expanded_gt_labels, expanded_gt_locs = self._matcher.match( 
@@ -160,11 +153,6 @@ class SSD(object):
                                                                                 actual_labels, 
                                                                                 actual_loc_rects,
                                                                                 actual_loc_rects_)
-            """
-            #cv2.imwrite("image_{}_gt.png".format(i), image)
-            #image = input_images[i]*255
-            """
-
             positives.append(pos_list)
             negatives.append(neg_list)
             ex_gt_labels.append(expanded_gt_labels)
@@ -173,29 +161,32 @@ class SSD(object):
             """
             for k in range(len(pos_list)):
                 if pos_list[k]==1:
-                    xmin, ymin, xmax, ymax = self._default_boxes[k].get_bbox_info(self._image_width,
-                                                                                  self._image_height,
-                                                                                  center_x=self._default_boxes[k]._center_x,
-                                                                                  center_y=self._default_boxes[k]._center_y,
-                                                                                  width=self._default_boxes[k]._width,
-                                                                                  height=self._default_boxes[k]._height)
+                    [xmin, ymin, xmax, ymax], _ = self._default_boxes[k].get_bbox_info(
+                                                    self._image_width,
+                                                    self._image_height,
+                                                    center_x={"bbox":self._default_boxes[k]._center_x, "offset":expanded_gt_locs[k][0]},
+                                                    center_y={"bbox":self._default_boxes[k]._center_y, "offset":expanded_gt_locs[k][1]},
+                                                    width=   {"bbox":self._default_boxes[k]._width,    "offset":np.exp(expanded_gt_locs[k][2])},
+                                                    height=  {"bbox":self._default_boxes[k]._height,   "offset":np.exp(expanded_gt_locs[k][3])})
 
                     image = cv2.rectangle(image, (xmin, ymin), (xmax, ymax), (255,0,0))
-            cv2.imwrite("image_{}.png".format(i), image)
+            cv2.imwrite("image_{}_gt.png".format(i), image)
             """
-        
+
 
         feed_dict = {self.input: input_images,
                      self.pos_val: positives,
                      self.neg_val: negatives,
                      self.gt_labels_val: ex_gt_labels,
                      self.gt_boxes_val: ex_gt_boxes}
-        loss, _, loss_conf, loss_loc = sess.run([self._loss_op, self._train_op, self._loss_conf_op, self._loss_loc_op], feed_dict=feed_dict)
+        loss, _, loss_conf, loss_loc, confs, locs = sess.run([self._loss_op, self._train_op, self._loss_conf_op, self._loss_loc_op, self._confs, self._locs], feed_dict=feed_dict)
 
         #w = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="SSD/biasesfmap6")[0]
         #print("weight:{}".format(w))
         #print("weight:{}".format(w.eval(session=sess)))
         #print("weight:{}".format(self._network.get_variables()))
+
+        self._loss_old = loss
 
 
         return _, loss, loss_conf, loss_loc
@@ -233,16 +224,18 @@ class SSD(object):
         # ---------------------------------------------
         slicer = indicies[prob_min<top200] # index
 
-
+        # ---------------------------------------------
+        # generate detected bbox (default-box + offset)
+        # ---------------------------------------------
         def generate_bbox(dboxs, offsets):
             rects = []
             for dbox, offset in zip(dboxs, offsets):
-                xmin, ymin, xmax, ymax = dbox.get_bbox_info(self._image_width,
-                                                            self._image_height,
-                                                            center_x=[dbox._center_x, offset[0]],
-                                                            center_y=[dbox._center_y, offset[1]],
-                                                            width=[dbox._width, np.exp(offset[2])],
-                                                            height=[dbox._height, np.exp(offset[3])])
+                [xmin, ymin, xmax, ymax], _ = dbox.get_bbox_info(self._image_width,
+                                                                 self._image_height,
+                                                                 center_x={"bbox":dbox._center_x, "offset":offset[0]},
+                                                                 center_y={"bbox":dbox._center_y, "offset":offset[1]},
+                                                                 width=   {"bbox":dbox._width,    "offset":np.exp(offset[2])},
+                                                                 height=  {"bbox":dbox._height,   "offset":np.exp(offset[3])})
                 rects.append([xmin, ymin, xmax, ymax])
             return np.array(rects)
 
@@ -270,3 +263,16 @@ class SSD(object):
             filtered_labels = np.zeros((4, 1))
         
         return filtered_locs, filtered_labels
+    
+
+    def save(self, image, positive, negative, ex_gt_labels, ex_gt_boxes, loss, loss_conf, loss_loc, conf, loc):
+        pickle.dump(loss, open("debug/loss_{}.pickle".format(self._num), "wb"))
+        pickle.dump(loss_conf, open("debug/loss_conf_{}.pickle".format(self._num), "wb"))
+        pickle.dump(loss_loc, open("debug/loss_loc_{}.pickle".format(self._num), "wb"))
+        pickle.dump(positive, open("debug/positive_{}.pickle".format(self._num), "wb"))
+        pickle.dump(negative, open("debug/negative_{}.pickle".format(self._num), "wb"))
+        pickle.dump(ex_gt_boxes, open("debug/ex_gt_boxes_{}.pickle".format(self._num), "wb"))
+        pickle.dump(ex_gt_labels, open("debug/ex_gt_labels_{}.pickle".format(self._num), "wb"))
+        pickle.dump(conf, open("debug/conf_{}.pickle".format(self._num), "wb"))
+        pickle.dump(loc, open("debug/loc_{}.pickle".format(self._num), "wb"))
+        self._num += 1

@@ -12,8 +12,8 @@ image_channels = 3
 
 [train]
 batch_size = 10
-epoch = 1000
-lr = 0.001 #0.001
+epoch = 10000
+lr = 0.005 #0.001
 val_step = 10
 use_gpu = true
 output_class = 21

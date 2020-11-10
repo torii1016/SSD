@@ -55,15 +55,15 @@ class Inferencer(object):
         image = cv2.resize(image, (self._image_width, self._image_height))
         if len(labels) and len(locs):
             for label, loc in zip(labels, locs):
+                if 1<(loc[2]-loc[0])*(loc[2]-loc[0]) and label!=20:
+                    loc = np.array([loc[0], loc[1], loc[2], loc[3]])
 
-                loc = np.array([loc[0], loc[1], loc[2], loc[3]])
-
-                cv2.rectangle(image, 
+                    cv2.rectangle(image, 
                                 (int(loc[0]), int(loc[1])), 
                                 (int(loc[2]), int(loc[3])), 
                                 (0, 0, 255), 1)
 
-                cv2.putText(image, 
+                    cv2.putText(image, 
                             str(self._label_name[int(label)]), 
                             (int(loc[0]), int(loc[1])), 
                             cv2.FONT_HERSHEY_SIMPLEX,
@@ -74,7 +74,10 @@ class Inferencer(object):
     def inference(self):
 
         num = 0
+        #input_images, input_labels = self._data_loader.get_test_data()
         input_images, input_labels = self._data_loader.get_test_data()
+        input_images = input_images[:10]
+        input_labels = input_labels[:10]
         for image, label in zip(input_images, input_labels):
             pred_confs, pred_locs = self._ssd.inference(self._sess, image)
             locs, labels = self._ssd.detect_objects(pred_confs, pred_locs, self._n_top, self._prob_min, self._overlap_th)

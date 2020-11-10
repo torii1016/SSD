@@ -62,16 +62,25 @@ class DefaultBox(object):
     
 
     def get_bbox_info(self, image_width, image_height, center_x, center_y, width, height):
+        """
+        [Input]
+            image_width  : input image width
+            image_hieght : input image height
+            center_x     : bounding box center-x {"bbox":--, "offset":--}
+            center_y     : bounding box center-y {"bbox":--, "offset":--}
+            width        : bounding box width    {"bbox":--, "offset":--}
+            height       : bounding box height   {"bbox":--, "offset":--}
+        """
 
-        box_center_x = image_width*center_x[0]-0.5
-        box_center_y = image_height*center_y[0]-0.5
-        box_width = image_width*width[0]*self._scale*(1/np.sqrt(self._aspect))
-        box_height = image_height*height[0]*self._scale*np.sqrt(self._aspect)
+        box_center_x = image_width*center_x["bbox"]-0.5
+        box_center_y = image_height*center_y["bbox"]-0.5
+        box_width = image_width*width["bbox"]*self._scale*(1/np.sqrt(self._aspect))
+        box_height = image_height*height["bbox"]*self._scale*np.sqrt(self._aspect)
 
-        real_center_x = box_center_x+image_width*center_x[1]
-        real_center_y = box_center_y+image_height*center_y[1]
-        real_width = box_width*width[1]
-        real_height = box_height*height[1]
+        real_center_x = box_center_x+box_width*center_x["offset"]
+        real_center_y = box_center_y+box_height*center_y["offset"]
+        real_width = box_width*width["offset"]
+        real_height = box_height*height["offset"]
 
         xmin = int(real_center_x-real_width/2) 
         ymin = int(real_center_y-real_height/2)
@@ -92,7 +101,7 @@ class DefaultBox(object):
         ymin = exception_process(ymin, min_x=0, max_x=image_height-1)
         ymax = exception_process(ymax, min_x=0, max_x=image_height-1)
 
-        return xmin, ymin, xmax, ymax
+        return [xmin, ymin, xmax, ymax], [real_center_x, real_center_y, real_width, real_height]
 
 
 

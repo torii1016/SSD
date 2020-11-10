@@ -4,6 +4,10 @@ def non_maximum_suppression(boxes, labels, overlap_threshold=0.7):
     """
     Non-Maximum Suppression algorithm
     this is nms(non maximum_suppression) which filters predicted objects.
+
+    [Input]
+        boxes  : [good-boxes-numbet][box-info-dim] (box-info-dim: [top-left x-coordinate, top-left y-coordinate, bottom-right x-coordinate, bottom-right y-coordinate])
+        labels : [good-boxes-numbet]
     """
     
     if len(boxes)==0:
@@ -12,7 +16,7 @@ def non_maximum_suppression(boxes, labels, overlap_threshold=0.7):
     picked = []
 
     # ---------------------------------------------
-    # boxes list: [top-left x-coordinate, top-left y-coordinate, bottom-right x-coordinate, bottom-right y-coordinate]
+    # devide boxes info: [top-left x-coordinate, top-left y-coordinate, bottom-right x-coordinate, bottom-right y-coordinate]
     # ---------------------------------------------
     x1 = boxes[:,0]
     y1 = boxes[:,1]
@@ -49,7 +53,6 @@ def non_maximum_suppression(boxes, labels, overlap_threshold=0.7):
             # overlap of current box and those in area list
             # ---------------------------------------------
             overlap = float(w*h)/area[j]
-
             # ---------------------------------------------
             # suppress current box
             # ---------------------------------------------
