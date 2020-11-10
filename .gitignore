@@ -1,7 +1,8 @@
-scripts/model/__pycache__/*
-scripts/model/tf_util/__pycache__/*
+dataset/*
+debug/*
 logs/*
 result/*
 saved_model/*
-dataset/*
+scripts/model/__pycache__/*
+scripts/model/tf_util/__pycache__/*
 scripts/utils/__pycache__/*
