@@ -1,22 +1,23 @@
-[network]
-ssd_config = "config/ssd.toml"
-
 [dataset]
-image = "dataset/VOC2007/JPEGImages/"
-label = "dataset/VOC2007/VOC2007.pkl"
-test_data_num = 300
-label_name = ["aeroplane", "bicycle", "bird", "boat", "bottle", "bus", "car", "cat", "chair", "cow", "diningtable", "dog", "horse", "motorbike", "person", "pottedplant", "sheep", "sofa", "train", "tvmonitor", "Unknown"]
-image_width = 300
-image_height = 300
-image_channels = 3
+    [dataset.VOC2007]
+    name = "VOC2007"
+    image = "dataset/VOC2007/JPEGImages/"
+    label = "dataset/VOC2007/VOC2007.pkl"
+    test_data_num = 300
+    label_name = ["aeroplane", "bicycle", "bird", "boat", "bottle", "bus", "car", "cat", "chair", "cow", "diningtable", "dog", "horse", "motorbike", "person", "pottedplant", "sheep", "sofa", "train", "tvmonitor", "Unknown"]
+    image_width = 300
+    image_height = 300
+    image_channels = 3
 
 [test]
-lr = 0.001 
+network = "config/ssd.toml"
+dataset = "MNIST"
+epoch = 10000
+lr = 0.001 #0.001
 val_step = 10
 use_gpu = true
-output_class = 21
 save_model_path = "saved_model"
 save_model_name = "model.dump"
 top_number = 200
 prob_min = 0.9
-overlap_threshold = 0.5
+overlap_threshold = 0.4

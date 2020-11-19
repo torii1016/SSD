@@ -30,6 +30,17 @@ class DefaultBox(object):
         self._xmin, self._ymin, self._xmax, self._ymax = self._convert_format([self._center_x, self._center_y, self._width, self._height])
 
 
+    def print(self, image_width, image_height):
+        print("------------------------------")
+        print("center_x:{}, center_y:{}".format(self._center_x, self._center_y))
+        print("width:{}, height:{}".format(self._width, self._height))
+        print("scale:{}, aspect:{}".format(self._scale, self._aspect))
+
+        print("center_x:{}, center_y:{}".format(int(image_width*self._center_x-0.5), int(image_height*self._center_y-0.5)))
+        #print("width:{}, height:{}".format(image_width*self._width*self._scale*(1/np.sqrt(self._aspect)), image_height*self._height*self._scale*np.sqrt(self._aspect)))
+        print("width:{}, height:{}".format(int(image_width*self._width), int(image_height*self._height)))
+        print("------------------------------")
+
     def _convert_format(self, inputs):
         """
         convert format from [center_x, center_y, width, height] to [top_left_x, top_left_y, bottom_right_x, bottom_right_y]
@@ -46,12 +57,12 @@ class DefaultBox(object):
         draw the default bounding box
         """
 
-        point1_x, point1_y, point2_x, point2_y = self.get_bbox_info(image_width=image.shape[0],
+        [point1_x, point1_y, point2_x, point2_y], _ = self.get_bbox_info(image_width=image.shape[0],
                                                                     image_height=image.shape[1],
-                                                                    center_x=self._center_x,
-                                                                    center_y=self._center_y,
-                                                                    width=self._width,
-                                                                    height=self._height)
+                                                                    center_x={"bbox":self._center_x, "offset":0.0},
+                                                                    center_y={"bbox":self._center_y, "offset":0.0},
+                                                                    width=   {"bbox":self._width,    "offset":1.0},
+                                                                    height=  {"bbox":self._height,   "offset":1.0})
         image = cv2.rectangle(img=image,
                               pt1=(point1_x, point1_y),
                               pt2=(point2_x, point2_y),
@@ -74,8 +85,10 @@ class DefaultBox(object):
 
         box_center_x = image_width*center_x["bbox"]-0.5
         box_center_y = image_height*center_y["bbox"]-0.5
-        box_width = image_width*width["bbox"]*self._scale*(1/np.sqrt(self._aspect))
-        box_height = image_height*height["bbox"]*self._scale*np.sqrt(self._aspect)
+        box_width = image_width*width["bbox"]
+        #box_width = image_width*width["bbox"]*self._scale*(1/np.sqrt(self._aspect))
+        box_height = image_height*height["bbox"]
+        #box_height = image_height*height["bbox"]*self._scale*np.sqrt(self._aspect)
 
         real_center_x = box_center_x+box_width*center_x["offset"]
         real_center_y = box_center_y+box_height*center_y["offset"]

@@ -27,7 +27,8 @@ def non_maximum_suppression(boxes, labels, overlap_threshold=0.7):
     # compute the area of the bounding boxes and sort the bounding box
     # ---------------------------------------------
     area = (boxes[:,2]-boxes[:,0])*(boxes[:,3]-boxes[:,1])
-    idxs = np.argsort(y2)
+    #idxs = np.argsort(y2)
+    idxs = np.array(range(len(boxes)))
 
     while len(idxs) > 0:
         last = len(idxs) - 1

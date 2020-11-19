@@ -32,14 +32,13 @@ class _ssd_network(Layers):
 
 class SSD(object):
     
-    def __init__(self, param, config, image_info, label_name=None):
+    def __init__(self, param, config, image_info, output_dim):
         self._lr = param["lr"]
-        self._output_dim = param["output_class"]
         self._image_width, self._image_height, self._image_channels = image_info
+        self._output_dim = output_dim
 
         self._network = _ssd_network([config["SSD"]["network"]["name"]], config)
         self._box_generator = BoxGenerator(config["SSD"]["default_box"])
-        self._label_name = label_name
         self._num = 0
         self._loss_old = None
 
@@ -58,7 +57,7 @@ class SSD(object):
         image = np.zeros([300,300,3])
         for i in range(len(self._default_boxes)):
             image = self._default_boxes[i].draw_rect(image)
-        cv2.imwrite("image.png", image)
+        cv2.imwrite("default_box.png", image)
         """
 
     def _set_network(self):
@@ -161,16 +160,10 @@ class SSD(object):
             """
             for k in range(len(pos_list)):
                 if pos_list[k]==1:
-                    [xmin, ymin, xmax, ymax], _ = self._default_boxes[k].get_bbox_info(
-                                                    self._image_width,
-                                                    self._image_height,
-                                                    center_x={"bbox":self._default_boxes[k]._center_x, "offset":expanded_gt_locs[k][0]},
-                                                    center_y={"bbox":self._default_boxes[k]._center_y, "offset":expanded_gt_locs[k][1]},
-                                                    width=   {"bbox":self._default_boxes[k]._width,    "offset":np.exp(expanded_gt_locs[k][2])},
-                                                    height=  {"bbox":self._default_boxes[k]._height,   "offset":np.exp(expanded_gt_locs[k][3])})
-
-                    image = cv2.rectangle(image, (xmin, ymin), (xmax, ymax), (255,0,0))
-            cv2.imwrite("image_{}_gt.png".format(i), image)
+                    image = input_images[i]*255
+                    image = self._default_boxes[k].draw_rect(image)
+                    self._default_boxes[k].print(self._image_width, self._image_height)
+                    cv2.imwrite("image_{}_gt.png".format(k), image)
             """
 
 
@@ -217,12 +210,13 @@ class SSD(object):
         # ---------------------------------------------
         indicies = np.argpartition(possibilities, -n_top_probs)[-n_top_probs:] # index
         top200 = np.asarray(possibilities)[indicies] # value
-        print("top200:{}".format(top200))
+        #print("top200:{}".format(top200))
 
         # ---------------------------------------------
         # exclude candidates with a possibility value below the threshold
         # ---------------------------------------------
         slicer = indicies[prob_min<top200] # index
+        slicer = slicer[np.argsort(np.asarray(possibilities)[slicer])]
 
         # ---------------------------------------------
         # generate detected bbox (default-box + offset)
@@ -263,16 +257,3 @@ class SSD(object):
             filtered_labels = np.zeros((4, 1))
         
         return filtered_locs, filtered_labels
-    
-
-    def save(self, image, positive, negative, ex_gt_labels, ex_gt_boxes, loss, loss_conf, loss_loc, conf, loc):
-        pickle.dump(loss, open("debug/loss_{}.pickle".format(self._num), "wb"))
-        pickle.dump(loss_conf, open("debug/loss_conf_{}.pickle".format(self._num), "wb"))
-        pickle.dump(loss_loc, open("debug/loss_loc_{}.pickle".format(self._num), "wb"))
-        pickle.dump(positive, open("debug/positive_{}.pickle".format(self._num), "wb"))
-        pickle.dump(negative, open("debug/negative_{}.pickle".format(self._num), "wb"))
-        pickle.dump(ex_gt_boxes, open("debug/ex_gt_boxes_{}.pickle".format(self._num), "wb"))
-        pickle.dump(ex_gt_labels, open("debug/ex_gt_labels_{}.pickle".format(self._num), "wb"))
-        pickle.dump(conf, open("debug/conf_{}.pickle".format(self._num), "wb"))
-        pickle.dump(loc, open("debug/loc_{}.pickle".format(self._num), "wb"))
-        self._num += 1
